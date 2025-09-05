@@ -1,14 +1,16 @@
 import tkinter as tk
-from tkinter import ttk
-import csv
 import os
-from tkinter import messagebox
 import webbrowser
-import win32print
-import win32ui
+import win32print  #to remove soon
+import win32ui #to remove soon
+import sqlite3
+import listPort as lp
+from tkinter import ttk, messagebox
+import printerPopup as pp
 class Module1Page(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.initializeDB()
         self.controller = controller
 
         # Header
@@ -34,6 +36,8 @@ class Module1Page(tk.Frame):
         self.subpages = {}
         self.subpage_container = tk.Frame(self)
         self.subpage_container.pack(fill="both", expand=True)
+        self.subpage_container.grid_rowconfigure(0, weight=1)
+        self.subpage_container.grid_columnconfigure(0, weight=1)
 
         for name, FrameClass in {
             "supplier": SupplierManagementPage,
@@ -46,46 +50,110 @@ class Module1Page(tk.Frame):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self.show_subpage("supplier")
+        
 
     def show_subpage(self, name):
         self.subpages[name].tkraise()
+        self.subpages[name].grid_rowconfigure(0, weight=1)
+        self.subpages[name].grid_columnconfigure(0, weight=1)
+        self.subpage_container.grid_rowconfigure(0, weight=1)
+        self.subpage_container.grid_columnconfigure(0, weight=1)
     def MainMenu(self):
         self.controller.show_frame("MainMenuPage")
+    def initializeDB(self):
+        print("Initializing Database...")
+        DB_FILE = "inventory.db"
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS suppliers (
+            supplierCode TEXT PRIMARY KEY,
+            supplierName TEXT,
+            country TEXT,
+            email TEXT,
+            contactPerson TEXT,
+            contactNumber TEXT,
+            facebookPage TEXT,
+            webPage TEXT,
+            shippingNotes TEXT
+            
+            
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS raw_inventory (
+            supplierCode TEXT PRIMARY KEY,
+            supplierName TEXT,
+            partNumber TEXT,
+            qtyPerMotherBox INTEGER,
+            qtyPerInnerBox INTEGER,
+            itemDescription TEXT,
+            unitOfMeasurement TEXT,
+            materialType TEXT,
+            color TEXT,
+            partCostPerPiece TEXT,
+            shelfNumber TEXT,
+            shelfLocation TEXT,
+            warehouseNumber TEXT,
+            warehouseLocation TEXT
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS final_inventory (
+            customerCode TEXT,
+            customerName TEXT,
+            partNumber TEXT ,
+            qtyPartNumber INTEGER,
+            finalItemcode TEXT PRIMARY KEY,
+            itemDescription TEXT,
+            barcodeNumber TEXT,
+            shelfNumber TEXT,
+            shelfLocation TEXT,
+            warehouseNumber TEXT,
+            warehouseLocation TEXT
+                       
+        )
+        """)
+
+        conn.commit()
+        conn.close()
+
+
+        
 
 # ====================
 # SUBMODULE A - Supplier Management
 # ====================
-import tkinter as tk
-from tkinter import ttk, messagebox
-import webbrowser
 
 
 class SupplierManagementPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self.CSV_FILE = "suppliers.csv"
-
-        self.CSV_COLUMNS = [
-    "Supplier Number", "Supplier Name", "Country", "Email",
-    "Contact Person", "Contact Num.", "FB Page", "Web Page", "Shipping Notes"
-]
-        # Side Panel (Main Menu)
-        self.menu_panel = tk.Frame(self, bg="#2c3e50", width=200)
+        self.DB_FILE = "inventory.db"
+        # top menu bar
+        self.menu_panel = tk.Frame(self, bg="#2c3e50", width=00)
         self.menu_panel.pack(side="left", fill="y")
 
-        tk.Button(self.menu_panel, text="Main Menu", bg="#2c3e50", fg="white", font=("Arial", 14, "bold"),command=lambda: self.controller.MainMenu()).pack(pady=10)
+        tk.Button(self.menu_panel, text="Main Menu", bg="#2c3e50", fg="white", font=("Arial", 14, "bold"),command=lambda: self.controller.MainMenu()).pack(pady=10,side="top")
         
         btn_supplier = tk.Button(self.menu_panel, text="Supplier Management", width=20,command=lambda: self.controller.show_subpage("supplier"))
-        btn_supplier.pack(pady=5)
+        btn_supplier.pack(pady=5,side="top")
 
-        tk.Button(self.menu_panel, text="Raw Inventory", width=20,command=lambda: self.controller.show_subpage("raw")).pack(pady=5)
-        tk.Button(self.menu_panel, text="Final Inventory", width=20,command=lambda: self.controller.show_subpage("final")).pack(pady=5)
+        tk.Button(self.menu_panel, text="Raw Inventory", width=20,command=lambda: self.controller.show_subpage("raw")).pack(pady=5,side="top")
+        tk.Button(self.menu_panel, text="Final Inventory", width=20,command=lambda: self.controller.show_subpage("final")).pack(pady=5,side="top")
 
         # Main Content
         content_frame = tk.Frame(self)
+        
         content_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
+        content_frame.grid_rowconfigure(1, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(1, weight=1)
+        
         # Hide Menu Button
         #btn_close_menu = tk.Button(content_frame, text="❌ Close Menu", command=self.toggle_menu)
        # btn_close_menu.grid(row=0, column=0, sticky="w", columnspan=2)
@@ -95,40 +163,40 @@ class SupplierManagementPage(tk.Frame):
         form_frame.grid(row=1, column=0, sticky="nw")
 
         tk.Label(form_frame, text="supplierNumber:", font=("Arial", 10)).grid(row=0, column=0, sticky="e", pady=2)
-        self.supplierNumber = tk.Entry(form_frame, width=20)
+        self.supplierNumber = tk.Entry(form_frame, width=50)
         self.supplierNumber.grid(row=0, column=1, sticky="w", padx=(0, 5))
 
         tk.Label(form_frame, text="supplierName:", font=("Arial", 10)).grid(row=1, column=0, sticky="e", pady=2)
-        self.supplierName = tk.Entry(form_frame, width=20)
+        self.supplierName = tk.Entry(form_frame, width=50)
         self.supplierName.grid(row=1, column=1, sticky="w", padx=(0, 5))
 
         tk.Label(form_frame, text="country:", font=("Arial", 10)).grid(row=2, column=0, sticky="e", pady=2)
-        self.country = tk.Entry(form_frame, width=20)
+        self.country = tk.Entry(form_frame, width=50)
         self.country.grid(row=2, column=1, sticky="w", padx=(0, 5))
 
         tk.Label(form_frame, text="email:", font=("Arial", 10)).grid(row=3, column=0, sticky="e", pady=2)
-        self.email = tk.Entry(form_frame, width=20)
+        self.email = tk.Entry(form_frame, width=50)
         self.email.grid(row=3, column=1, sticky="w", padx=(0, 5))
 
         tk.Label(form_frame, text="Contact Person:", font=("Arial", 10)).grid(row=4, column=0, sticky="e", pady=2)
-        self.contact_name = tk.Entry(form_frame, width=20)
+        self.contact_name = tk.Entry(form_frame, width=50)
         self.contact_name.grid(row=4, column=1, sticky="w", padx=(0, 5))
 
         tk.Label(form_frame, text="Contact Number:", font=("Arial", 10)).grid(row=5, column=0, sticky="e", pady=2)
-        self.contact_number = tk.Entry(form_frame, width=20)
-        self.contact_number.grid(row=5, column=1, sticky="e")
+        self.contact_number = tk.Entry(form_frame, width=50)
+        self.contact_number.grid(row=5, column=1, sticky="w")
 
         tk.Label(form_frame, text="Facebook Page:", font=("Arial", 10)).grid(row=6, column=0, sticky="e", pady=2)
-        self.Facebook = tk.Entry(form_frame, width=20)
-        self.Facebook.grid(row=6, column=1, sticky="e")
+        self.Facebook = tk.Entry(form_frame, width=50)
+        self.Facebook.grid(row=6, column=1, sticky="w")
 
         tk.Label(form_frame, text="Web Page:", font=("Arial", 10)).grid(row=7, column=0, sticky="e", pady=2)
-        self.Web = tk.Entry(form_frame, width=20)
-        self.Web.grid(row=7, column=1, sticky="e")
+        self.Web = tk.Entry(form_frame, width=50)
+        self.Web.grid(row=7, column=1, sticky="w")
 
         tk.Label(form_frame, text="Shipping Notes:", font=("Arial", 10)).grid(row=8, column=0, sticky="e", pady=2)
-        self.Shipping = tk.Entry(form_frame, width=20)
-        self.Shipping.grid(row=8, column=1, sticky="e")
+        self.Shipping = tk.Entry(form_frame, width=50)
+        self.Shipping.grid(row=8, column=1, sticky="w")
         # Action Buttons
         button_frame = tk.Frame(content_frame)
         button_frame.grid(row=1, column=1, sticky="ne", padx=10)
@@ -137,8 +205,7 @@ class SupplierManagementPage(tk.Frame):
             ("Add", self.add_supplier),
             ("Edit", self.edit_supplier),
             ("Delete", self.delete_supplier),
-            ("Visit Web...", lambda: self.controller.open_web(self.Web.get()) if hasattr(self.controller, "open_web") else None),
-            ("Load Column", self.onSelect)
+            ("Visit Web...", self.openWeb),
         ]
         for label, command in actions:
             tk.Button(button_frame, text=label, width=30, command=command).pack(pady=3)
@@ -162,30 +229,57 @@ class SupplierManagementPage(tk.Frame):
         
         scroll_x.config(command=self.tree.xview)
         scroll_y.config(command=self.tree.yview)
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        scroll_y.grid(row=0, column=1, sticky="ns")
-        scroll_x.grid(row=1, column=0, sticky="ew")
+        self.tree.grid(row=1, column=0, sticky="nsew")
+        scroll_y.grid(row=1, column=1, sticky="ns")
+        scroll_x.grid(row=2, column=0, sticky="ew")
 
         # Make the table area resizable
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
-        self.load_csv_data()
-        #self.tree.bind("<<TreeviewSelect>>", self.onSelect)
+        self.tree.bind("<<TreeviewSelect>>", self.onSelect)
 
-
-#def toggle_menu(self):
-    #if self.menu_visible:
-    #    self.menu_panel.pack_forget()
-     #   self.menu_visible = False
-      #  self.btn_toggle_menu.config(text="📂 Open Menu")
-    #else:
-     #   self.menu_panel.pack(side="left", fill="y")  # Always left
-      #  self.menu_visible = True
-       # self.btn_toggle_menu.config(text="❌ Close Menu")
-
+      #  searchFrame = tk.Frame(form_frame)
+       # searchFrame.grid(row=10, column=0, sticky="nw")
+        tk.Label(form_frame, text=" ").grid(row=10,column=0,sticky="w")
+        tk.Label(form_frame, text="Search:").grid(row=11,column=0,sticky="w")
+        self.search_entry = tk.Entry(form_frame, width=50)
+        self.search_entry.grid(row=11,column=1,sticky="w")
+        self.search_entry.bind("<Return>", self.search)
+        self.loadSuppliers()
 # -------------------------------
-# CSV functions kdsopfjisfhgjdfjhkjbgjbfgjnbfjdnsjkflajsdfkjsdkjfhsdf I love u GPT.. but ur also useless
+# sqlite3 stuff 
 # --------------
+    def openWeb(self):
+        url = self.Web.get().strip()
+        if url:
+            if not url.startswith("http"):
+                url = "http://" + url
+            webbrowser.open(url)
+        else:
+            messagebox.showwarning("No URL", "Web Page field is empty.")
+    def search(self,event):
+        query = self.search_entry.get().strip()
+        self.tree.selection_remove(self.tree.selection())  # clear previous selection
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            sqlcom = """
+                SELECT * FROM suppliers
+                WHERE supplierCode LIKE ?
+                OR supplierName LIKE ?
+                OR country LIKE ?
+                OR email LIKE ?
+                OR contactPerson LIKE ?
+                OR contactNumber LIKE ?
+                OR facebookPage LIKE ?
+                OR webPage LIKE ?
+                OR shippingNotes LIKE ?
+            """
+            params = tuple([f"%{query}%"] * 9)  # 14 fields
+            cursor.execute(sqlcom, params)
+            self.tree.delete(*self.tree.get_children())
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
+        print("searching..." , query)
     def onSelect(self,event):
         print("dsjofhidsuhfuidh")
         selected_item = self.tree.selection()
@@ -217,23 +311,17 @@ class SupplierManagementPage(tk.Frame):
         self.Web.insert(0, row_values[7])
 
         self.Shipping.delete(0, tk.END)
-        self.Shipping.insert(0, row_values[8])
-    def loadColumn(self):
-        print("LoadColumn")        
-    def load_csv_data(self):
-
-        if not os.path.exists(self.CSV_FILE):
-            with open(self.CSV_FILE, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(self.CSV_COLUMNS)
-            return
-
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.DictReader(f)
-            self.tree.delete(*self.tree.get_children())  # Clear table
-            for row in reader:
-                values = [row[col] for col in self.CSV_COLUMNS]
-                self.tree.insert("", "end", values=values)
+        self.Shipping.insert(0, row_values[8])       
+    def loadSuppliers(self):
+        print("Loading Suppliers...")
+        self.tree.delete(*self.tree.get_children())
+        print(self.DB_FILE)
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM suppliers")
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
+        #self.selected_id = None
 
     def add_supplier(self):
         data = [
@@ -245,48 +333,48 @@ class SupplierManagementPage(tk.Frame):
             self.contact_number.get(),
             self.Facebook.get(),
             self.Web.get(),
-            self.Shipping.get()
-        ]
-
-        if not data[0]:  # Require Supplier Number
-            messagebox.showwarning("Missing Info", "Supplier Number is required.")
+            self.Shipping.get()]
+        if not all(field.strip() for field in data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
-
-        with open(self.CSV_FILE, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(data)
-
-        self.tree.insert("", "end", values=data)
-        self.clear_form()
-
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO suppliers (supplierCode, supplierName, country, email, contactPerson, contactNumber, facebookPage, webPage, shippingNotes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (            
+                self.supplierNumber.get(),
+                self.supplierName.get(),
+                self.country.get(),
+                self.email.get(),
+                self.contact_name.get(),
+                self.contact_number.get(),
+                self.Facebook.get(),
+                self.Web.get(),
+                self.Shipping.get()))
+            conn.commit()
+        self.loadSuppliers()
     def delete_supplier(self):
         selected = self.tree.selection()
+        print(selected)
         if not selected:
-            messagebox.showwarning("No selection", "Select a supplier to delete.")
+            messagebox.showwarning("No selection", "Select a supplier to edit.")
             return
+        values = self.tree.item(selected[0], "values")
+        supplierCode = values[0]
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM suppliers WHERE supplierCode=?", (supplierCode,))
+            conn.commit()
+            messagebox.showinfo(supplierCode, "Deleted Successfully")
+        self.loadSuppliers()
 
-        values_to_delete = self.tree.item(selected[0])["values"]
-        self.tree.delete(selected[0])
-
-        rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row != values_to_delete:
-                    rows.append(row)
-
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(rows)
 
     def edit_supplier(self):
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("No selection", "Select a supplier to edit.")
             return
-
         new_data = [
             self.supplierNumber.get(),
             self.supplierName.get(),
@@ -298,51 +386,36 @@ class SupplierManagementPage(tk.Frame):
             self.Web.get(),
             self.Shipping.get()
         ]
-
-        if not new_data[0]:
-            messagebox.showwarning("Missing Info", "Supplier Number is required.")
+        if not all(field.strip() for field in new_data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
-
-        selected_item = selected[0]
-        old_data = self.tree.item(selected_item)["values"]
-
-        self.tree.item(selected_item, values=new_data)
-
-        # Update the CSV
-        updated_rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row == old_data:
-                    updated_rows.append(new_data)
-                else:
-                    updated_rows.append(row)
-
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(updated_rows)
-
-        self.clear_form()
-
-    def fill_form_from_tree(self, event):
-        selected = self.tree.selection()
-        if not selected:
-            return
-        values = self.tree.item(selected[0])['values']
-        entries = [
-            self.supplierNumber, self.supplierName, self.country, self.email,
-            self.contact_name, self.contact_number, self.Facebook, self.Web, self.Shipping
-        ]
-        for entry, value in zip(entries, values):
-            entry.delete(0, tk.END)
-            entry.insert(0, value)
-
-    def clear_form(self):
-        for widget in [self.supplierNumber, self.supplierName, self.country, self.email,
-                    self.contact_name, self.contact_number, self.Facebook, self.Web, self.Shipping]:
-            widget.delete(0, tk.END)
+        
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            values = self.tree.item(selected[0], "values")
+            original_code = values[0] 
+            cursor.execute("SELECT * FROM suppliers WHERE supplierCode=? AND supplierCode<>?", 
+                       (self.supplierNumber.get(), original_code))
+            if cursor.fetchone() is not None:
+                messagebox.showwarning("Error", "Supplier Number already exists")
+                return
+            cursor.execute("""
+                UPDATE suppliers 
+                SET supplierCode=?, supplierName=?, country=?, email=?, contactPerson=?, contactNumber=?, facebookPage=?, webPage=?, shippingNotes=?
+                WHERE supplierCode=?
+            """, (self.supplierNumber.get(),
+                self.supplierName.get(),
+                self.country.get(),
+                self.email.get(),
+                self.contact_name.get(),
+                self.contact_number.get(),
+                self.Facebook.get(),
+                self.Web.get(),
+                self.Shipping.get(),
+                self.supplierNumber.get(),
+                ))
+            conn.commit()
+        self.loadSuppliers()
     
 
 # ====================
@@ -351,17 +424,9 @@ class SupplierManagementPage(tk.Frame):
 class RawInventoryEntryPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.DB_FILE = "inventory.db"
         self.controller = controller
         # Side Panel (Main Menu)
-        self.CSV_FILE = "raw_inventory.csv"
-
-        self.CSV_COLUMNS = [
-    "Customer Code", "Customer Name", "Part Number", "Qty Per Mother Box",
-    "Qty Per Inner Box", "Item Description", "Facebook", "Unit Of Measurement",
-    "Material Type", "Color", "Part Cost Per Piece", "Shelf Number",
-    "Shelf Location", "Warehouse Number", "Warehouse Location"
-]
-        
         self.menu_panel = tk.Frame(self, bg="#2c3e50", width=200)
         self.menu_panel.pack(side="left", fill="y")
 
@@ -373,28 +438,35 @@ class RawInventoryEntryPage(tk.Frame):
         tk.Button(self.menu_panel, text="Raw Inventory", width=20,command=lambda: self.controller.show_subpage("raw")).pack(pady=5)
         tk.Button(self.menu_panel, text="Final Inventory", width=20,command=lambda: self.controller.show_subpage("final")).pack(pady=5)
 
-        #Main content --------
+        # Main content --------
         content_frame = tk.Frame(self)
-        content_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-        tk.Label(content_frame, text="Raw Inventory", font=("Arial", 14, "bold")).grid(pady=10)
+        content_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_rowconfigure(1, weight=2)
+        content_frame.grid_rowconfigure(2, weight=3)
+        #tk.Label(content_frame, text="Raw Inventory", font=("Arial", 14, "bold")).grid(pady=10)
 
 
-        form_frame = tk.Frame(content_frame)
-        form_frame.grid(row=2, column=0, sticky="nw")
-        searchFrame = tk.Frame(content_frame)
-        searchFrame.grid(row=1, column=0, sticky="nw")
-        tk.Label(searchFrame, text="Search Raw Part (Part Number / Shelf / Warehouse):").grid(row=1,column=0,sticky="w")
+        form_frame = tk.LabelFrame(content_frame,text="form entry",padx=10,pady=10)
+        form_frame.grid(row=1, column=0, sticky="nsew")
+        searchFrame = tk.LabelFrame(content_frame,text="search",padx=10,pady=10)
+        searchFrame.grid(row=0, column=0, sticky="nsew")
+        tk.Label(searchFrame, text="Search:").grid(row=1,column=0,sticky="w")
         self.search_entry = tk.Entry(searchFrame, width=50)
         self.search_entry.grid(row=1,column=1,sticky="w")
-        tk.Button(searchFrame, text="Search", command=self.search).grid(row=1, column=2, sticky="w")
+        self.search_entry.bind("<Return>", self.search)
+
+        
+        #tk.Button(searchFrame, text="Search", command=self.search).grid(row=1, column=2, sticky="w")
+
         fields = [
-    ("Customer Code", "customerCode"),
-    ("Customer Name", "customerName"),
+    ("Supplier Code", "supplierCode"),
+    ("Supplier Name", "supplierName"),
     ("Part Number", "partNumber"),
     ("Qty per Mother Box", "qtyPerMotherBox"),
     ("Qty per Innerbox ", "qtyPerInnerBox"),
-    ("Item Description", "itemDescription"),
-    ("Facebook", "Facebook"),   
+    ("Item Description", "itemDescription"), 
     ("Unit of Measurement", "unitOfMeasurement"),]
         secondField = [
     ("Material Type", "materialType"),
@@ -407,23 +479,22 @@ class RawInventoryEntryPage(tk.Frame):
 ]
 
         for idx, (label_text, var_name) in enumerate(fields):
-            tk.Label(form_frame, text=label_text + ":", font=("Arial", 10)).grid(row=idx +1 , column=0, sticky="e", pady=2)
+            tk.Label(form_frame, text=label_text + ":", font=("Arial", 10)).grid(row=idx  , column=0, sticky="e", pady=2)
             setattr(self, var_name, tk.Entry(form_frame, width=30))
-            getattr(self, var_name).grid(row=idx +1, column=1, sticky="w", padx=(0, 5))
+            getattr(self, var_name).grid(row=idx, column=1, sticky="w", padx=(0, 5))
         for idx, (label_text, var_name) in enumerate(secondField):
-            tk.Label(form_frame, text=label_text + ":", font=("Arial", 10)).grid(row=idx+1 , column=2, sticky="e", pady=2)
+            tk.Label(form_frame, text=label_text + ":", font=("Arial", 10)).grid(row=idx , column=2, sticky="e", pady=2)
             setattr(self, var_name, tk.Entry(form_frame, width=30))
-            getattr(self, var_name).grid(row=idx+1, column=3, sticky="w", padx=(0, 5))
-        table_frame = tk.Frame(content_frame)
-        table_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=10)
-
-        columns = ( "Code",
-    "Customer Names",
+            getattr(self, var_name).grid(row=idx, column=3, sticky="w", padx=(0, 5))
+        table_frame = tk.LabelFrame(content_frame,text="Inventory Table",padx=10,pady=10 )
+        table_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=10)
+        self.itemDescription.grid_configure(columnspan=3)
+        columns = ( "Supplier Code",
+    "Supplier Name",
     "Part Number",
     "Qty Per Mother Box",
     "Qty Per Innerbox Of The Mother Box",
     "Item Description",
-    "Facebook",
     "Unit Of Measurement",
     "Material Type",
     "Color",
@@ -438,48 +509,68 @@ class RawInventoryEntryPage(tk.Frame):
             self.tree.column(col, width=50)
 
         self.tree.pack(fill="both", expand=True)
-
+        self.tree.bind("<<TreeviewSelect>>", self.onSelect)
         self.check_var = tk.IntVar() # Variable to store the checkbox state
         self.checkbox = tk.Checkbutton(form_frame, text="Print Label", variable=self.check_var)
         self.checkbox.grid(pady=5,row=4,column=4)
         #tk.Label(form_frame, text="New Raw Inventory Entry").grid(pady=5,row=2,column=4)
-        tk.Button(form_frame, text="Load Selected Column", command=self.onSelect).grid(pady=5,row=2,column=4)
-        tk.Button(form_frame, text="Save to raw_inventory", command=self.add_supplier).grid(pady=5,row=3,column=4)
-        self.load_csv_data()
+        # tk.Button(form_frame, text="Load Selected Column", command=self.onSelect).grid(pady=5,row=2,column=4)
+        button_frame = tk.LabelFrame(content_frame,text="",padx=10,pady=10)
+        button_frame.grid(row=0, column=1, sticky="nsew", padx=10,rowspan=2)
+        content_frame.grid_rowconfigure(2, weight=0)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_rowconfigure(1, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(1, weight=1)
+        tk.Button(button_frame, text="Add", command=self.addRawInv,width=20).pack(expand=True,fill="x",side="top")
+        tk.Button(button_frame, text="Edit", command=self.editRawInv,width=20).pack(expand=True,fill="x",side="top")
+        tk.Button(button_frame, text="Delete", command=self.deleteRawInv,width=20).pack(expand=True,fill="x",side="top")
+        self.loadRawInventory()
 
 #============
-#RAHHHHHHHHH MORE CSV LOADING IM SURE U CAN JUST CALL ALL DIS IN A FUNCTION IN MODULE(aka im reminding myself to test this in the future)
+#yey its sql now..ihated csv HAWHAWH
 #==========
-    def search(self):
-        query = self.search_entry.get().strip().lower()
-        if not query:
-            messagebox.showwarning("Search", "Enter text to search.")
-            return
-
+    def search(self,event):
+        query = self.search_entry.get().strip()
+        print("searching...", query)
         self.tree.selection_remove(self.tree.selection())  # clear previous selection
-        found = False
-        for item_id in self.tree.get_children():
-            values = self.tree.item(item_id, "values")
-            # Check each column for partial match
-            if any(query in str(v).lower() for v in values):
-                self.tree.selection_add(item_id)
-                self.tree.see(item_id)  # scroll into view
-                found = True
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            sqlcom = """
+                SELECT * FROM raw_inventory
+                WHERE supplierCode LIKE ?
+                OR supplierName LIKE ?
+                OR partNumber LIKE ?
+                OR qtyPerMotherBox LIKE ?
+                OR qtyPerInnerBox LIKE ?
+                OR itemDescription LIKE ?
+                OR unitOfMeasurement LIKE ?
+                OR materialType LIKE ?
+                OR color LIKE ?
+                OR partCostPerPiece LIKE ?
+                OR shelfNumber LIKE ?
+                OR shelfLocation LIKE ?
+                OR warehouseNumber LIKE ?
+                OR warehouseLocation LIKE ?
+            """
+            params = tuple([f"%{query}%"] * 14)  # 14 fields
+            cursor.execute(sqlcom, params)
+            self.tree.delete(*self.tree.get_children())
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
 
-        if not found:
-            messagebox.showinfo("Search", "No matching records found.")
 
-    def onSelect(self):
+    def onSelect(self,event):
         print("dsjofhidsuhfuidh")
         selected_item = self.tree.selection()
         if not selected_item:
             return
         row_values = self.tree.item(selected_item)["values"]
-        self.customerCode.delete(0, tk.END)
-        self.customerCode.insert(0, row_values[0])
+        self.supplierCode.delete(0, tk.END)
+        self.supplierCode.insert(0, row_values[0])
 
-        self.customerName.delete(0, tk.END)
-        self.customerName.insert(0, row_values[1])
+        self.supplierName.delete(0, tk.END)
+        self.supplierName.insert(0, row_values[1])
 
         self.partNumber.delete(0, tk.END)
         self.partNumber.insert(0, row_values[2])
@@ -493,33 +584,31 @@ class RawInventoryEntryPage(tk.Frame):
         self.itemDescription.delete(0, tk.END)
         self.itemDescription.insert(0, row_values[5])
 
-        self.Facebook.delete(0, tk.END)
-        self.Facebook.insert(0, row_values[6])
-
         self.unitOfMeasurement.delete(0, tk.END)
-        self.unitOfMeasurement.insert(0, row_values[7])
+        self.unitOfMeasurement.insert(0, row_values[6])
 
         self.materialType.delete(0, tk.END)
-        self.materialType.insert(0, row_values[8])
+        self.materialType.insert(0, row_values[7])
         
         self.color.delete(0, tk.END)
-        self.color.insert(0, row_values[9])
+        self.color.insert(0, row_values[8])
         
         self.partCostPerPiece.delete(0, tk.END)
-        self.partCostPerPiece.insert(0, row_values[10])
+        self.partCostPerPiece.insert(0, row_values[9])
         
         self.shelfNumber.delete(0, tk.END)
-        self.shelfNumber.insert(0, row_values[11])
+        self.shelfNumber.insert(0, row_values[10])
         
         self.shelfLocation.delete(0, tk.END)
-        self.shelfLocation.insert(0, row_values[12])
+        self.shelfLocation.insert(0, row_values[11])
 
         self.warehouseNumber.delete(0, tk.END)
-        self.warehouseNumber.insert(0, row_values[13])
+        self.warehouseNumber.insert(0, row_values[12])
 
         self.warehouseLocation.delete(0, tk.END)
-        self.warehouseLocation.insert(0, row_values[14])
+        self.warehouseLocation.insert(0, row_values[13])
     def send_to_printer(printer_name, ezpl_code):
+        print("Sending to printer:", printer_name)
         """
         Send EZPL raw code directly to a Godex printer.
         """
@@ -539,31 +628,25 @@ class RawInventoryEntryPage(tk.Frame):
         finally:
             win32print.ClosePrinter(hPrinter)
       
-    def load_csv_data(self):
-
-        if not os.path.exists(self.CSV_FILE):
-            with open(self.CSV_FILE, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(self.CSV_COLUMNS)
-            return
-
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.DictReader(f)
-            self.tree.delete(*self.tree.get_children())  # Clear table
-            for row in reader:
-                values = [row[col] for col in self.CSV_COLUMNS]
-                self.tree.insert("", "end", values=values)
-
-    def add_supplier(self):
+    def loadRawInventory(self):
+        print("Loading Raw Inventory...")
+        self.tree.delete(*self.tree.get_children())
+        print(self.DB_FILE)
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM raw_inventory")
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
+    def addRawInv(self):
+        print("Adding Raw Inventory...")
         print(self.check_var.get())
         data = [
-self.customerCode.get(),
-self.customerName.get(),
+self.supplierCode.get(),
+self.supplierName.get(),
 self.partNumber.get(),
 self.qtyPerMotherBox.get(),
 self.qtyPerInnerBox.get(),
 self.itemDescription.get(),
-self.Facebook.get(),
 self.unitOfMeasurement.get(),
 self.materialType.get(),
 self.color.get(),
@@ -575,16 +658,38 @@ self.warehouseLocation.get()
 
         ]
 
-        if not data[0]:  # Require Supplier Number
-            messagebox.showwarning("Missing Info", "Supplier Number is required.")
+        if not all(field.strip() for field in data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
 
-        with open(self.CSV_FILE, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(data)
-
-        self.tree.insert("", "end", values=data)
-        self.clear_form()
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+    INSERT INTO raw_inventory (
+        supplierCode, supplierName, partNumber,
+        qtyPerMotherBox, qtyPerInnerBox, itemDescription,
+        unitOfMeasurement, materialType, color,
+        partCostPerPiece, shelfNumber, shelfLocation,
+        warehouseNumber, warehouseLocation
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (            
+self.supplierCode.get(),
+self.supplierName.get(),
+self.partNumber.get(),
+self.qtyPerMotherBox.get(),
+self.qtyPerInnerBox.get(),
+self.itemDescription.get(),
+self.unitOfMeasurement.get(),
+self.materialType.get(),
+self.color.get(),
+self.partCostPerPiece.get(),
+self.shelfNumber.get(),
+self.shelfLocation.get(),
+self.warehouseNumber.get(),
+self.warehouseLocation.get()))
+            conn.commit()
+        self.loadRawInventory()
         if self.check_var.get() == 1:
             print("Checkbox is checked")
             self.print_label(self.itemDescription.get(), self.partNumber.get(), self.qtyPerMotherBox.get(), self.shelfNumber.get(), self.warehouseNumber.get())
@@ -625,42 +730,35 @@ self.warehouseLocation.get()
             self.send_to_printer(printer_name, ezpl)
 
         
-    def delete_supplier(self):
+    def deleteRawInv(self):
+        print("Deleting Raw Inventory...")
         selected = self.tree.selection()
+        print(selected)
         if not selected:
-            messagebox.showwarning("No selection", "Select a supplier to delete.")
+            messagebox.showwarning("No selection", "No selection made.")
             return
+        values = self.tree.item(selected[0], "values")
+        partNumber = values[2]
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM raw_inventory WHERE partNumber=?", (partNumber,))
+            conn.commit()
+            messagebox.showinfo(partNumber, "Deleted Successfully")
+        self.loadRawInventory()
 
-        values_to_delete = self.tree.item(selected[0])["values"]
-        self.tree.delete(selected[0])
-
-        rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row != values_to_delete:
-                    rows.append(row)
-
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(rows)
-
-    def edit_supplier(self):
+    def editRawInv(self):
         selected = self.tree.selection()
         if not selected:
-            messagebox.showwarning("No selection", "Select a supplier to edit.")
+            messagebox.showwarning("No selection", "No selection made.")
             return
 
         new_data = [
-self.customerCode.get(),
-self.customerName.get(),
+self.supplierCode.get(),
+self.supplierName.get(),
 self.partNumber.get(),
 self.qtyPerMotherBox.get(),
 self.qtyPerInnerBox.get(),
 self.itemDescription.get(),
-self.Facebook.get(),
 self.unitOfMeasurement.get(),
 self.materialType.get(),
 self.color.get(),
@@ -672,57 +770,56 @@ self.warehouseLocation.get()
 
         ]
 
-        if not new_data[0]:
-            messagebox.showwarning("Missing Info", "Supplier Number is required.")
+        if not all(field.strip() for field in new_data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
 
-        selected_item = selected[0]
-        old_data = self.tree.item(selected_item)["values"]
+            # Check if the record already exists (assuming partNumber is the PK)
+            cursor.execute("""
+                SELECT 1 FROM raw_inventory WHERE partNumber = ?
+            """, (self.partNumber.get(),))
+            exists = cursor.fetchone()
 
-        self.tree.item(selected_item, values=new_data)
+            if exists:
+                # Delete old record
+                cursor.execute("""
+                    DELETE FROM raw_inventory WHERE partNumber = ?
+                """, (self.partNumber.get(),))
 
-        # Update the CSV
-        updated_rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row == old_data:
-                    updated_rows.append(new_data)
-                else:
-                    updated_rows.append(row)
+            # Insert new record
+                cursor.execute("""
+                INSERT INTO raw_inventory (
+                    supplierCode, supplierName, partNumber,
+                    qtyPerMotherBox, qtyPerInnerBox, itemDescription,
+                    unitOfMeasurement, materialType, color,
+                    partCostPerPiece, shelfNumber, shelfLocation,
+                    warehouseNumber, warehouseLocation
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                self.supplierCode.get(),
+                self.supplierName.get(),
+                self.partNumber.get(),
+                self.qtyPerMotherBox.get(),
+                self.qtyPerInnerBox.get(),
+                self.itemDescription.get(),
+                self.unitOfMeasurement.get(),
+                self.materialType.get(),
+                self.color.get(),
+                self.partCostPerPiece.get(),
+                self.shelfNumber.get(),
+                self.shelfLocation.get(),
+                self.warehouseNumber.get(),
+                self.warehouseLocation.get()
+            ))
 
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(updated_rows)
+                conn.commit()
 
-        self.clear_form()
-
-    def fill_form_from_tree(self, event):
-        selected = self.tree.selection()
-        if not selected:
-            return
-        values = self.tree.item(selected[0])['values']
-        entries = [
-            self.customerCode, self.customerName, self.partNumber, self.qtyPerMotherBox,
-            self.qtyPerInnerBox, self.itemDescription, self.Facebook, self.unitOfMeasurement,
-            self.materialType, self.color, self.partCostPerPiece, self.shelfNumber,
-            self.shelfLocation, self.warehouseNumber, self.warehouseLocation
-]
-        for entry, value in zip(entries, values):
-            entry.delete(0, tk.END)
-            entry.insert(0, value)
-
-    def clear_form(self):
-        for widget in [
-            self.customerCode, self.customerName, self.partNumber, self.qtyPerMotherBox,
-            self.qtyPerInnerBox, self.itemDescription, self.Facebook, self.unitOfMeasurement,
-            self.materialType, self.color, self.partCostPerPiece, self.shelfNumber,
-            self.shelfLocation, self.warehouseNumber, self.warehouseLocation
-        ]:
-            widget.delete(0, tk.END)
-
+                messagebox.showinfo("Success", "Raw inventory editedsuccessfully")
+            else:
+                messagebox.showwarning("Not Found", "Item not found for editing")   
+        self.loadRawInventory()
 # ====================
 # SUBMODULE C - Final Inventory Entry
 # ====================
@@ -730,22 +827,7 @@ class FinalInventoryEntryPage(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self.CSV_FILE = "final_inventory.csv"
-
-        self.CSV_COLUMNS = [
-    "Customer Code",
-    "Customer Name",
-    "Part Numbers Used",
-    "Qty of Said Part Number",
-    "Final Itemcode",
-    "Item Description",
-    "Barcode Number",
-    "Shelf Number",
-    "Shelf Location",
-    "Warehouse Number",
-    "Warehouse Location"
-]
-
+        self.DB_FILE = "inventory.db"
         # Side Panel (Main Menu)
         self.menu_panel = tk.Frame(self, bg="#2c3e50", width=200)
         self.menu_panel.pack(side="left", fill="y")
@@ -758,17 +840,28 @@ class FinalInventoryEntryPage(tk.Frame):
         tk.Button(self.menu_panel, text="Raw Inventory", width=20,command=lambda: self.controller.show_subpage("raw")).pack(pady=5)
         tk.Button(self.menu_panel, text="Final Inventory", width=20,command=lambda: self.controller.show_subpage("final")).pack(pady=5)
 
-       # tk.Label(self, text="📦 Final Inventory Entry", font=("Arial", 14, "bold")).pack(pady=10)
-
-
+        # Main content --------
         content_frame = tk.Frame(self)
         content_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-        #tk.Label(content_frame, text="📥 Raw Inventory Entry", font=("Arial", 14, "bold")).grid(pady=10)
+        # search frame
+        searchFrame = tk.LabelFrame(content_frame,text="search",padx=10,pady=10)
+        searchFrame.grid(row=0, column=0, sticky="nsew")
+        tk.Label(searchFrame, text="Search:").grid(row=1,column=0,sticky="w")
+        self.search_entry = tk.Entry(searchFrame, width=50)
+        self.search_entry.grid(row=1,column=1,sticky="ew")
+        self.search_entry.bind("<Return>", self.searchFinalInv)
 
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        content_frame.grid_rowconfigure(2, weight=3)
+        content_frame.grid_rowconfigure(1, weight=2)
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=2)
+        content_frame.grid_columnconfigure(1, weight=1)
         # tk.Label(content_frame, text="Search Raw Part (Part Number / Shelf / Warehouse):").grid(row=1,column=0,sticky="w")
         #tk.Entry(content_frame, width=50).grid(row=1,column=1,sticky="w")
-        form_frame = tk.Frame(content_frame)
-        form_frame.grid(row=2, column=0, sticky="nw")
+        form_frame = tk.LabelFrame(content_frame, text="Final Inventory Entry", padx=10, pady=10)
+        form_frame.grid(row=1, column=0, sticky="nsew")
         fields = [
     ("Customer Code", "customerCode"),
     ("Customer Name", "customerName"),
@@ -794,8 +887,9 @@ class FinalInventoryEntryPage(tk.Frame):
             tk.Label(form_frame, text=label_text + ":", font=("Arial", 10)).grid(row=idx, column=2, sticky="e", pady=2)
             setattr(self, var_name, tk.Entry(form_frame, width=30))
             getattr(self, var_name).grid(row=idx, column=3, sticky="w", padx=(0, 5))
-        table_frame = tk.Frame(content_frame)
-        table_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=10)
+        table_frame = tk.LabelFrame(content_frame,text="Final Inventory Table",padx=10,pady=10 )
+        table_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=10)
+        self.itemDescription.grid_configure( columnspan=3, sticky="we", padx=(0,5))
 
         columns = (     "Customer Code",
     "Customer Name",
@@ -814,35 +908,61 @@ class FinalInventoryEntryPage(tk.Frame):
             self.tree.column(col, width=50)
 
         self.tree.pack(fill="both", expand=True)
-
-        check_var = tk.IntVar() # Variable to store the checkbox state
+        self.tree.bind("<<TreeviewSelect>>", self.onSelect)
+        #check_var = tk.IntVar() # Variable to store the checkbox state
         # checkbox = tk.Checkbutton(form_frame, text="Print Label", variable=check_var)
         # checkbox.grid(pady=5,row=4,column=4)
         #tk.Label(form_frame, text="New Raw Inventory Entry").grid(pady=5,row=2,column=4)
         
-        self.load_csv_data()
 
-
-        buttonFrame = tk.Frame(content_frame)
-        buttonFrame.grid(row=2, column=1, sticky="ne")
-        tk.Button(buttonFrame, text="Save to FInal Inventory").grid(pady=5,row=5,column=4)
-
-        tk.Label(buttonFrame, text="Search Final Item").grid(column=4,row=1)
-        tk.Entry(buttonFrame, width=20).grid(pady=5,column=4,row=2)
-
-        tk.Button(buttonFrame, text="Check / Generate Barcode").grid(pady=5,column=4, row=3)
+        buttonFrame = tk.LabelFrame(content_frame,text="  ",padx=10,pady=10)
+        buttonFrame.grid(row=0, column=1, sticky="nsew ",rowspan=2 ,columnspan=1)
+        buttonFrame.grid_columnconfigure(0, weight=1)
+        tk.Button(buttonFrame, text="Add",command=self.addFinalInv).grid(pady=5,row=3,column=0, sticky="ew")
+        tk.Button(buttonFrame, text="Print to GoDEX Printer", command=pp.choose_port_popup).grid(pady=5,column=0,row=2,sticky="ew")
+        tk.Button(buttonFrame, text="Edit",command=self.editFinalinv).grid(pady=5,row=4,column=0, sticky="ew")
+        tk.Button(buttonFrame, text="Delete",command=self.deleteFinalInv).grid(pady=5,row=5,column=0, sticky="ew")
+        tk.Button(buttonFrame, text="Check Barcode",command=self.checkBarcode).grid(pady=5,column=0, row=1, sticky="ew")
         #tk.Label(buttonFrame, text="Label Preview:").grid(pady=5,column=4, row=6)
 
         #preview_frame = tk.LabelFrame(buttonFrame, text="30x25mm Label Preview", padx=10, pady=10)
         #preview_frame.grid(pady=10 ,column=4, row=7)
         #tk.Label(preview_frame, text="(Label preview would go here)").grid()
 
-        tk.Button(buttonFrame, text="Print to GoDEX Printer", command=self.print_selected_label_godex).grid(pady=5,column=4,row=4)
+        
      #   tk.Button(form_frame, text="Save to final_inventory").pack()
+        self.loadFInalInv()
+
+
 # ==================
-# ;-; more CSV loading 
+# :p
 #==========================
-    def onSelect(self):
+    def searchFinalInv(self,event):
+        query = self.search_entry.get().strip()
+        self.tree.selection_remove(self.tree.selection())  # clear previous selection
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            sqlcom = """
+                SELECT * FROM final_inventory
+                WHERE customerCode LIKE ?
+                OR customerName LIKE ?
+                OR partNumber LIKE ?
+                OR qtyPartNumber LIKE ?
+                OR finalItemCode LIKE ?
+                OR itemDescription LIKE ?
+                OR barcodeNumber LIKE ?
+                OR shelfNumber LIKE ?
+                OR shelfLocation LIKE ?
+                OR warehouseNumber LIKE ?
+                OR warehouseLocation LIKE ?
+            """
+            params = tuple([f"%{query}%"] * 11)  # 14 fields
+            cursor.execute(sqlcom, params)
+            self.tree.delete(*self.tree.get_children())
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
+        print("searching..." , query)
+    def onSelect(self,event):
         print("dsjofhidsuhfuidh")
         selected_item = self.tree.selection()
         if not selected_item:
@@ -880,26 +1000,21 @@ class FinalInventoryEntryPage(tk.Frame):
         self.warehouseNumber.insert(0, row_values[9])
 
         self.warehouseLocation.delete(0, tk.END)
-        self.warehouseLocation.insert(0, row_values[10])
+        self.warehouseLocation.insert(0, row_values[10])     
 
-    def loadColumn(self):
-        print("LoadColumn")        
+    def loadFInalInv(self):
+        print("Loading Final Inventory...")
+        self.tree.delete(*self.tree.get_children())
+        #print(self.DB_FILE)
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM final_inventory")
+            for row in cursor.fetchall():
+                self.tree.insert("", "end", values=row)
+                #print("Loaded", row)
 
-    def load_csv_data(self):
-        if not os.path.exists(self.CSV_FILE):
-            with open(self.CSV_FILE, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(self.CSV_COLUMNS)
-            return
-
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.DictReader(f)
-            self.tree.delete(*self.tree.get_children())  # Clear table
-            for row in reader:
-                values = [row[col] for col in self.CSV_COLUMNS]
-                self.tree.insert("", "end", values=values)
-
-    def add_supplier(self):
+    def addFinalInv(self):
+        print("Adding Final Inventory...")
         data = [
             self.customerCode.get(),
             self.customerName.get(),
@@ -913,44 +1028,57 @@ class FinalInventoryEntryPage(tk.Frame):
             self.warehouseNumber.get(),
             self.warehouseLocation.get()
         ]
-
-        if not data[0]:  # Require Customer Code
-            messagebox.showwarning("Missing Info", "Customer Code is required.")
+        if not all(field.strip() for field in data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+    INSERT INTO final_inventory (
+        customerCode, customerName, partNumber, qtyPartNumber,
+        finalItemcode, itemDescription, barcodeNumber,
+        shelfNumber, shelfLocation, warehouseNumber, warehouseLocation
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+""", (            
+            self.customerCode.get(),
+            self.customerName.get(),
+            self.partNumbersUsed.get(),
+            self.qtyOfSaidPartNumber.get(),
+            self.finalItemcode.get(),
+            self.itemDescription.get(),
+            self.barcodeNumber.get(),
+            self.shelfNumber.get(),
+            self.shelfLocation.get(),
+            self.warehouseNumber.get(),
+            self.warehouseLocation.get()
+            ))
+            conn.commit()
+        self.loadFInalInv()
 
-        with open(self.CSV_FILE, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(data)
 
-        self.tree.insert("", "end", values=data)
-        self.clear_form()
+    def deleteFinalInv(self):
+        print("Deleting Final Inventory...")
+        selected = self.tree.selection()
+        print(selected)
+        if not selected:
+            messagebox.showwarning("No selection")
+            return
+        values = self.tree.item(selected[0], "values")
+        finalItemcode = values[4]
+        #print("deleting", finalItemcode)
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM final_inventory WHERE finalItemcode=?", (finalItemcode,))
+            conn.commit()
+            messagebox.showinfo(finalItemcode, "Deleted Successfully")
+        self.loadFInalInv()
 
-    def delete_supplier(self):
+    def editFinalinv(self):
+        print("Editing Final Inventory...")
         selected = self.tree.selection()
         if not selected:
-            messagebox.showwarning("No selection", "Select a customer to delete.")
-            return
-
-        values_to_delete = self.tree.item(selected[0])["values"]
-        self.tree.delete(selected[0])
-
-        rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row != values_to_delete:
-                    rows.append(row)
-
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(rows)
-
-    def edit_supplier(self):
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("No selection", "Select a customer to edit.")
+            messagebox.showwarning("No selection")
             return
 
         new_data = [
@@ -967,58 +1095,51 @@ class FinalInventoryEntryPage(tk.Frame):
             self.warehouseLocation.get()
         ]
 
-        if not new_data[0]:
-            messagebox.showwarning("Missing Info", "Customer Code is required.")
+        if not all(field.strip() for field in new_data):
+            messagebox.showwarning("Missing Info", "All fields are required.")
             return
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 1 FROM final_inventory WHERE finalItemcode = ?
+            """, (self.finalItemcode.get(),))
+            exists = cursor.fetchone()
 
-        selected_item = selected[0]
-        old_data = self.tree.item(selected_item)["values"]
-
-        self.tree.item(selected_item, values=new_data)
-
-        # Update the CSV
-        updated_rows = []
-        with open(self.CSV_FILE, 'r', newline='') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                if row == old_data:
-                    updated_rows.append(new_data)
-                else:
-                    updated_rows.append(row)
-
-        with open(self.CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(updated_rows)
-
-        self.clear_form()
-
-    def fill_form_from_tree(self, event):
-        selected = self.tree.selection()
-        if not selected:
-            return
-        values = self.tree.item(selected[0])['values']
-        entries = [
-            self.customerCode, self.customerName, self.partNumbersUsed,
-            self.qtyOfSaidPartNumber, self.finalItemcode, self.itemDescription,
-            self.barcodeNumber, self.shelfNumber, self.shelfLocation,
-            self.warehouseNumber, self.warehouseLocation
-        ]
-        for entry, value in zip(entries, values):
-            entry.delete(0, tk.END)
-            entry.insert(0, value)
-
-    def clear_form(self):
-        for widget in [
-            self.customerCode, self.customerName, self.partNumbersUsed,
-            self.qtyOfSaidPartNumber, self.finalItemcode, self.itemDescription,
-            self.barcodeNumber, self.shelfNumber, self.shelfLocation,
-            self.warehouseNumber, self.warehouseLocation
-        ]:
-            widget.delete(0, tk.END)
-            
-
+            if exists:
+                # Delete old record
+                cursor.execute("""
+                    DELETE FROM final_inventory WHERE finalItemcode = ?
+                """, (self.finalItemcode.get(),))
+                cursor.execute("""
+                INSERT INTO final_inventory (
+                customerCode,
+                customerName,
+                partNumber,
+                qtyPartNumber,
+                finalItemcode,
+                itemDescription ,
+                barcodeNumber ,
+                shelfNumber,
+                shelfLocation ,
+                warehouseNumber,
+                warehouseLocation ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+""", (            self.customerCode.get(),
+            self.customerName.get(),
+            self.partNumbersUsed.get(),
+            self.qtyOfSaidPartNumber.get(),
+            self.finalItemcode.get(),
+            self.itemDescription.get(),
+            self.barcodeNumber.get(),
+            self.shelfNumber.get(),
+            self.shelfLocation.get(),
+            self.warehouseNumber.get(),
+            self.warehouseLocation.get()
+                ))
+                conn.commit()
+                messagebox.showinfo("Success", "Final inventory edited successfully")
+            else:
+                messagebox.showwarning("Error", "Final Itemcode does not exist")
+        self.loadFInalInv()
     def print_selected_label_godex(self):
         """Print selected final inventory item to GoDEX printer as 30x25mm label (Barcode, ItemCode, Description)"""
         selected = self.tree.selection()
@@ -1081,3 +1202,17 @@ E
             win32print.EndDocPrinter(hPrinter)
         finally:
             win32print.ClosePrinter(hPrinter)
+    def checkBarcode(self):
+        print("Checking Barcode...")
+        barcode = self.barcodeInput.get().strip()
+        if not barcode:
+            messagebox.showwarning("Input Error", "Please enter a barcode number.")
+            return
+        with sqlite3.connect(self.DB_FILE, timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM final_inventory WHERE barcodeNumber=?", (barcode,))
+            result = cursor.fetchone()
+            if result:
+                messagebox.showinfo("Found", f"Item found:\nItem Code: {result[4]}\nDescription: {result[5]}")
+            else:
+                messagebox.showwarning("Not Found", "No item found with that barcode.") 
